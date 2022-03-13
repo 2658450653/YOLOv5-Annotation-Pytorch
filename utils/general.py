@@ -56,7 +56,8 @@ def set_logging(name=None, verbose=True):
 LOGGER = set_logging(__name__)  # define globally (used in train.py, val.py, detect.py, etc.)
 
 '''
-    上下文管理模块，使被管理的代码，每次执行完都会输出一次执行用时
+    装饰器，使被管理的代码，每次执行完都会输出一次执行用时
+    用法@Profile()或者with Profile()
 '''
 
 
@@ -70,7 +71,7 @@ class Profile(contextlib.ContextDecorator):
 
 
 '''
-    上下文管理模块，超时管理，仅限在linux下使用
+    装饰器，超时管理，仅限在linux下使用
 '''
 
 
@@ -182,6 +183,7 @@ def user_config_dir(dir='Ultralytics', env_var='YOLOV5_CONFIG_DIR'):
     path.mkdir(exist_ok=True)  # make if required
     return path
 
+
 # 判断次目录是否可写
 def is_writeable(dir, test=False):
     # Return True if directory has write permissions, test opening a file with write permissions if test=True
@@ -217,12 +219,14 @@ def is_pip():
     return 'site-packages' in Path(__file__).resolve().parts
 
 
+# 判断是否是asscii编码，如果是unicode字符串长度会发生变化
 def is_ascii(s=''):
     # Is string composed of all ASCII (no UTF) characters? (note str().isascii() introduced in python 3.7)
     s = str(s)  # convert list, tuple, None, etc. to str
     return len(s.encode().decode('ascii', 'ignore')) == len(s)
 
 
+# 判断一个字符串是否包含中文
 def is_chinese(s='人工智能'):
     # Is string composed of any Chinese characters?
     return re.search('[\u4e00-\u9fff]', s)
@@ -233,6 +237,7 @@ def emojis(str=''):
     return str.encode().decode('ascii', 'ignore') if platform.system() == 'Windows' else str
 
 
+# 获取文件或文件夹的大小
 def file_size(path):
     # Return file/dir size (MB)
     path = Path(path)
@@ -244,6 +249,7 @@ def file_size(path):
         return 0.0
 
 
+# 检查网络是否畅通
 def check_online():
     # Check internet connectivity
     import socket
@@ -263,7 +269,6 @@ def check_git_status():
     assert Path('.git').exists(), 'skipping check (not a git repository)' + msg
     assert not is_docker(), 'skipping check (Docker image)' + msg
     assert check_online(), 'skipping check (offline)' + msg
-
     cmd = 'git fetch && git config --get remote.origin.url'
     url = check_output(cmd, shell=True, timeout=5).decode().strip().rstrip('.git')  # git fetch
     branch = check_output('git rev-parse --abbrev-ref HEAD', shell=True).decode().strip()  # checked out
@@ -275,9 +280,11 @@ def check_git_status():
     print(emojis(s))  # emoji-safe
 
 
+# 检查是否满足python最低要求
 def check_python(minimum='3.6.2'):
     # Check current python version vs. required python version
-    check_version(platform.python_version(), minimum, name='Python ', hard=True)
+    print(f"\t current python version: {platform.python_version()} \n\t minimum version: {minimum}")
+    return check_version(platform.python_version(), minimum, name='Python ', hard=True)
 
 
 def check_version(current='0.0.0', minimum='0.0.0', name='version ', pinned=False, hard=False, verbose=False):
@@ -292,6 +299,31 @@ def check_version(current='0.0.0', minimum='0.0.0', name='version ', pinned=Fals
     return result
 
 
+def colorstr(*input):
+    # Colors a string https://en.wikipedia.org/wiki/ANSI_escape_code, i.e.  colorstr('blue', 'hello world')
+    *args, string = input if len(input) > 1 else ('blue', 'bold', input[0])  # color arguments, string
+    colors = {'black': '\033[30m',  # basic colors
+              'red': '\033[31m',
+              'green': '\033[32m',
+              'yellow': '\033[33m',
+              'blue': '\033[34m',
+              'magenta': '\033[35m',
+              'cyan': '\033[36m',
+              'white': '\033[37m',
+              'bright_black': '\033[90m',  # bright colors
+              'bright_red': '\033[91m',
+              'bright_green': '\033[92m',
+              'bright_yellow': '\033[93m',
+              'bright_blue': '\033[94m',
+              'bright_magenta': '\033[95m',
+              'bright_cyan': '\033[96m',
+              'bright_white': '\033[97m',
+              'end': '\033[0m',  # misc
+              'bold': '\033[1m',
+              'underline': '\033[4m'}
+    return ''.join(colors[x] for x in args) + f'{string}' + colors['end']
+
+
 @try_except
 def check_requirements(requirements=ROOT / 'requirements.txt', exclude=(), install=True):
     # Check installed dependencies meet requirements (pass *.txt file or list of packages)
@@ -304,7 +336,7 @@ def check_requirements(requirements=ROOT / 'requirements.txt', exclude=(), insta
             requirements = [f'{x.name}{x.specifier}' for x in pkg.parse_requirements(f) if x.name not in exclude]
     else:  # list or tuple of packages
         requirements = [x for x in requirements if x not in exclude]
-
+    print(requirements)
     n = 0  # number of packages updates
     for r in requirements:
         try:
@@ -396,7 +428,7 @@ def check_file(file, suffix=''):
         assert len(files) == 1, f"Multiple files match '{file}', specify exact path: {files}"  # assert unique
         return files[0]  # return file
 
-
+# 检查是否下载了数据集，data参数可选，例如 data/coco128.yaml,data/coco.yaml
 def check_dataset(data, autodownload=True):
     # Download and/or unzip dataset if not found locally
     # Usage: https://github.com/ultralytics/yolov5/releases/download/v1.0/coco128_with_yaml.zip
@@ -418,7 +450,7 @@ def check_dataset(data, autodownload=True):
     for k in 'train', 'val', 'test':
         if data.get(k):  # prepend path
             data[k] = str(path / data[k]) if isinstance(data[k], str) else [str(path / x) for x in data[k]]
-
+    print(data)
     assert 'nc' in data, "Dataset 'nc' key missing."
     if 'names' not in data:
         data['names'] = [f'class{i}' for i in range(data['nc'])]  # assign class names if missing
@@ -447,7 +479,6 @@ def check_dataset(data, autodownload=True):
                 raise Exception('Dataset not found.')
 
     return data  # dictionary
-
 
 def url2file(url):
     # Convert URL to filename, i.e. https://url.com/file.txt?auth -> file.txt
@@ -505,31 +536,6 @@ def clean_str(s):
 def one_cycle(y1=0.0, y2=1.0, steps=100):
     # lambda function for sinusoidal ramp from y1 to y2 https://arxiv.org/pdf/1812.01187.pdf
     return lambda x: ((1 - math.cos(x * math.pi / steps)) / 2) * (y2 - y1) + y1
-
-
-def colorstr(*input):
-    # Colors a string https://en.wikipedia.org/wiki/ANSI_escape_code, i.e.  colorstr('blue', 'hello world')
-    *args, string = input if len(input) > 1 else ('blue', 'bold', input[0])  # color arguments, string
-    colors = {'black': '\033[30m',  # basic colors
-              'red': '\033[31m',
-              'green': '\033[32m',
-              'yellow': '\033[33m',
-              'blue': '\033[34m',
-              'magenta': '\033[35m',
-              'cyan': '\033[36m',
-              'white': '\033[37m',
-              'bright_black': '\033[90m',  # bright colors
-              'bright_red': '\033[91m',
-              'bright_green': '\033[92m',
-              'bright_yellow': '\033[93m',
-              'bright_blue': '\033[94m',
-              'bright_magenta': '\033[95m',
-              'bright_cyan': '\033[96m',
-              'bright_white': '\033[97m',
-              'end': '\033[0m',  # misc
-              'bold': '\033[1m',
-              'underline': '\033[4m'}
-    return ''.join(colors[x] for x in args) + f'{string}' + colors['end']
 
 
 def labels_to_class_weights(labels, nc=80):
